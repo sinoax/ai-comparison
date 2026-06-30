@@ -58,6 +58,9 @@ def ask_claude(prompt):
     except Exception as e:
         return f"Claudeエラー: {e}"
 
+def ask_summary(prompt):
+    return ask_gpt(prompt)
+
 import base64
 
 def image_to_text(uploaded_file):
@@ -103,6 +106,8 @@ def get_score(text):
     return "?"
 
 def run_grading(question, answer, mode, level_prompt):
+
+    st.write("run_grading開始")
 
     if mode == "英作文":
         prompt = f"""
@@ -188,70 +193,99 @@ def run_grading(question, answer, mode, level_prompt):
     【解説】
     """
 
-        # 画面上の進捗ステータス表示
-        gpt_status = st.empty()
-        gemini_status = st.empty()
-        claude_status = st.empty()
+    gpt_status = st.empty()
+    gemini_status = st.empty()
+    claude_status = st.empty()
 
-        gpt_status.info("🤖 GPT 添削中...")
-        gemini_status.info("✨ Gemini 添削中...")
-        claude_status.info("🦉 Claude 添削中...")
+    gpt_status.info("🤖 GPT 添削中...")
+    gemini_status.info("✨ Gemini 添削中...")
+    claude_status.info("🦉 Claude 添削中...")
 
-        gpt_result = ""
-        gemini_result = ""
-        claude_result = ""
+    gpt_result = ""
+    gemini_result = ""
+    claude_result = ""
 
-        # 3つのスレッドで並列処理を実行
-        with ThreadPoolExecutor(max_workers=3) as executor:
+    # 3つのスレッドで並列処理を実行
+    with ThreadPoolExecutor(max_workers=3) as executor:
 
-            futures = {
-                executor.submit(ask_gpt, prompt): "gpt",
-                executor.submit(ask_gemini, prompt): "gemini",
-                executor.submit(ask_claude, prompt): "claude"
-            }
+        futures = {
+            executor.submit(ask_gpt, prompt): "gpt",
+            executor.submit(ask_gemini, prompt): "gemini",
+            executor.submit(ask_claude, prompt): "claude"
+        }
 
-            for future in as_completed(futures):
-                ai_name = futures[future]
-                result = future.result()
+        for future in as_completed(futures):
+            ai_name = futures[future]
+            result = future.result()
 
-                if ai_name == "gpt":
-                    gpt_result = result
-                    gpt_status.success("🤖 GPT 完了")
-                elif ai_name == "gemini":
-                    gemini_result = result
-                    gemini_status.success("✨ Gemini 完了")
-                elif ai_name == "claude":
-                    claude_result = result
-                    claude_status.success("🦉 Claude 完了")
+            if ai_name == "gpt":
+                gpt_result = result
+                gpt_status.success("🤖 GPT 完了")
+            elif ai_name == "gemini":
+                gemini_result = result
+                gemini_status.success("✨ Gemini 完了")
+            elif ai_name == "claude":
+                claude_result = result
+                claude_status.success("🦉 Claude 完了")
 
-        gpt_score = get_score(gpt_result)
-        gemini_score = get_score(gemini_result)
-        claude_score = get_score(claude_result)
+    gpt_score = get_score(gpt_result)
+    gemini_score = get_score(gemini_result)
+    claude_score = get_score(claude_result)
         
-        st.subheader("採点結果")
+    st.subheader("採点結果")
 
-        score1, score2, score3 = st.columns(3)
+    score1, score2, score3 = st.columns(3)
 
-        with score1:
-            st.metric("GPT", f"{gpt_score}点")
+    with score1:
+        st.metric("GPT", f"{gpt_score}点")
 
-        with score2:
-            st.metric("Gemini", f"{gemini_score}点")
+    with score2:
+        st.metric("Gemini", f"{gemini_score}点")
 
-        with score3:
-            st.metric("Claude", f"{claude_score}点")
+    with score3:
+        st.metric("Claude", f"{claude_score}点")
         
-        # 画面を3分割して結果を横並びで表示
-        st.divider()
+    # 画面を3分割して結果を横並びで表示
+    st.divider()
 
-        with st.expander("🤖 GPT の添削結果"):
-            st.write(gpt_result)
+    with st.expander("🤖 GPT の添削結果"):
+        st.write(gpt_result)
 
-        with st.expander("✨ Gemini の添削結果"):
-            st.write(gemini_result)
+    with st.expander("✨ Gemini の添削結果"):
+        st.write(gemini_result)
 
-        with st.expander("🦉 Claude の添削結果"):
-            st.write(claude_result)
+    with st.expander("🦉 Claude の添削結果"):
+        st.write(claude_result)
+
+    summary_prompt = f"""
+    以下は3つのAIによる添削結果です。
+
+    【GPT】
+    {gpt_result}
+
+    【Gemini】
+    {gemini_result}
+
+    【Claude】
+    {claude_result}
+
+    3つを比較し、
+
+    ・総合得点
+    ・3AI共通の指摘
+    ・意見が分かれた点
+    ・最終的な改善点
+    ・最終模範解答
+
+    を日本語でまとめてください。
+    """
+    summary = ask_summary(summary_prompt)
+
+    st.divider()
+
+    st.subheader("🏆 総合判定")
+
+    st.write(summary)
 
 # =====================================================================
 # Streamlit UI画面の構築
